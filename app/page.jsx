@@ -69,8 +69,8 @@ export default async function Home() {
             Never Miss a Price Drop
           </h2>
           <p className="text-xl text-gray-600 mb-12 max-w-2xl mx-auto">
-            Track prices from any e-commerce site. Get instant alerts when
-            prices drop. Save money effortlessly.
+            Paste a product URL or search across top stores to compare prices.
+            Get instant alerts when prices drop. Save money effortlessly.
           </p>
 
           <AddProductForm user={user} />

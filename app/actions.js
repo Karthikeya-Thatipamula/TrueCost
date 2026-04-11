@@ -2,9 +2,120 @@
 
 import { createClient } from "@/utils/supabase/server";
 import { scrapeProduct } from "@/lib/firecrawl";
+import { FirecrawlAppV1 } from "@mendable/firecrawl-js";
 import { sendPriceDropAlert } from "@/lib/email";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
+
+const firecrawl = new FirecrawlAppV1({
+  apiKey: process.env.FIRECRAWL_API_KEY,
+});
+
+function parseNumericPrice(rawPrice) {
+  if (typeof rawPrice === "number") return rawPrice;
+  if (typeof rawPrice !== "string") return NaN;
+  const normalized = rawPrice.replace(/[^0-9.,]/g, "").replace(/,/g, "");
+  return Number(normalized);
+}
+
+export async function smartSearchProducts(query) {
+  const normalizedQuery = String(query || "").trim();
+  if (!normalizedQuery) {
+    return { error: "Please enter a product name to search." };
+  }
+
+  const searchTargets = [
+    {
+      platform: "Amazon.in",
+      url: `https://www.amazon.in/s?k=${encodeURIComponent(normalizedQuery)}`,
+    },
+    {
+      platform: "Flipkart",
+      url: `https://www.flipkart.com/search?q=${encodeURIComponent(normalizedQuery)}`,
+    },
+    {
+      platform: "Myntra",
+      url: `https://www.myntra.com/${encodeURIComponent(normalizedQuery)}`,
+    },
+  ];
+
+  try {
+    const settledResults = await Promise.allSettled(
+      searchTargets.map(async ({ platform, url }) => {
+        const result = await firecrawl.scrapeUrl(url, {
+          formats: ["extract"],
+          extract: {
+            prompt: `Extract up to 4 product cards from ${platform} search results for "${normalizedQuery}". Return product name, numeric price, currency (INR when missing), product page URL, and image URL.`,
+            schema: {
+              type: "object",
+              properties: {
+                products: {
+                  type: "array",
+                  items: {
+                    type: "object",
+                    properties: {
+                      name: { type: "string" },
+                      price: { type: ["number", "string"] },
+                      currency: { type: "string" },
+                      url: { type: "string" },
+                      image_url: { type: "string" },
+                    },
+                    required: ["name", "price", "url"],
+                  },
+                },
+              },
+              required: ["products"],
+            },
+          },
+        });
+
+        const extracted = Array.isArray(result?.extract?.products)
+          ? result.extract.products
+          : [];
+
+        return extracted
+          .map((item) => ({
+            platform,
+            name: String(item.name || "").trim(),
+            price: parseNumericPrice(item.price),
+            currency: String(item.currency || "INR").trim().toUpperCase(),
+            url: String(item.url || "").trim(),
+            image_url: String(item.image_url || "").trim(),
+          }))
+          .filter(
+            (item) =>
+              item.name &&
+              item.url &&
+              Number.isFinite(item.price) &&
+              item.price > 0
+          );
+      })
+    );
+
+    const flattened = settledResults
+      .filter((entry) => entry.status === "fulfilled")
+      .flatMap((entry) => entry.value);
+
+    const deduped = Array.from(
+      new Map(flattened.map((item) => [item.url, item])).values()
+    ).slice(0, 12);
+
+    if (deduped.length === 0) {
+      return { error: "No products found. Try a different search phrase." };
+    }
+
+    const lowestPrice = Math.min(...deduped.map((item) => item.price));
+    const results = deduped.map((item) => ({
+      ...item,
+      isBestDeal: item.price === lowestPrice,
+    }));
+
+    return { success: true, results };
+  } catch (error) {
+    console.error("Smart product search error:", error);
+    return { error: error.message || "Failed to search products" };
+  }
+}
 
 export async function addProduct(formData) {
   const url = formData.get("url");
