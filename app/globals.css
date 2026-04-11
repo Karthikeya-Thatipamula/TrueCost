@@ -130,55 +130,44 @@
 }
 @layer utilities {
   .hero-title-roll {
-    @apply relative inline-block h-[1.3em] overflow-hidden align-bottom;
+    @apply relative inline-block h-[1.2em] overflow-hidden align-bottom;
   }
 
   .hero-title-track {
     @apply block;
-    animation: hero-roll 24s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+    animation: hero-vertical-roll 20s cubic-bezier(0.25, 0.46, 0.45, 0.94) infinite;
     will-change: transform;
   }
 
   .hero-title-line {
     @apply block whitespace-nowrap;
-    line-height: 1.3em;
+    line-height: 1.2em;
   }
 }
 
-@keyframes hero-roll {
+@keyframes hero-vertical-roll {
   0%,
-  14% {
+  16% {
     transform: translateY(0);
-    opacity: 1;
   }
-  17%,
-  31% {
-    transform: translateY(-100%);
-    opacity: 1;
+  20%,
+  36% {
+    transform: translateY(-1.2em);
   }
-  34%,
-  48% {
-    transform: translateY(-200%);
-    opacity: 1;
+  40%,
+  56% {
+    transform: translateY(-2.4em);
   }
-  51%,
-  65% {
-    transform: translateY(-300%);
-    opacity: 1;
+  60%,
+  76% {
+    transform: translateY(-3.6em);
   }
-  68%,
-  82% {
-    transform: translateY(-400%);
-    opacity: 1;
-  }
-  85%,
-  99% {
-    transform: translateY(-500%);
-    opacity: 1;
+  80%,
+  96% {
+    transform: translateY(-4.8em);
   }
   100% {
-    transform: translateY(-500%);
-    opacity: 1;
+    transform: translateY(-6em);
   }
 }
 
