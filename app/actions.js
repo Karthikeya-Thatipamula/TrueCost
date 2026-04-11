@@ -2,6 +2,7 @@
 
 import { createClient } from "@/utils/supabase/server";
 import { scrapeProduct } from "@/lib/firecrawl";
+import { sendPriceDropAlert } from "@/lib/email";
 import { revalidatePath } from "next/cache";
 import { redirect } from "next/navigation";
 
@@ -147,4 +148,88 @@ export async function signOut() {
   await supabase.auth.signOut();
   revalidatePath("/");
   redirect("/");
+}
+
+export async function checkPricesNow() {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { error: "Not authenticated" };
+    }
+
+    const { data: products, error: productsError } = await supabase
+      .from("products")
+      .select("*")
+      .eq("user_id", user.id);
+
+    if (productsError) throw productsError;
+
+    let updated = 0;
+    let priceDrops = 0;
+
+    for (const product of products || []) {
+      try {
+        const scrapedData = await scrapeProduct(product.url);
+        const hasPrice =
+          scrapedData?.currentPrice !== null &&
+          scrapedData?.currentPrice !== undefined;
+
+        if (!hasPrice) continue;
+
+        const newPrice = Number(scrapedData.currentPrice);
+        const oldPrice = Number(product.current_price);
+
+        if (!Number.isFinite(newPrice) || newPrice === oldPrice) {
+          continue;
+        }
+
+        const now = new Date().toISOString();
+
+        const { error: updateError } = await supabase
+          .from("products")
+          .update({
+            current_price: newPrice,
+            updated_at: now,
+          })
+          .eq("id", product.id);
+
+        if (updateError) continue;
+
+        const { error: historyError } = await supabase.from("price_history").insert({
+          product_id: product.id,
+          price: newPrice,
+          currency: product.currency,
+        });
+
+        if (historyError) continue;
+
+        updated += 1;
+
+        if (newPrice < oldPrice) {
+          priceDrops += 1;
+          if (user.email) {
+            await sendPriceDropAlert(user.email, product, oldPrice, newPrice);
+          }
+        }
+      } catch (productError) {
+        console.error(`Price check failed for product ${product.id}:`, productError);
+      }
+    }
+
+    revalidatePath("/");
+
+    return {
+      success: true,
+      updated,
+      priceDrops,
+      message: `Checked ${products?.length || 0} product(s). Updated ${updated}, with ${priceDrops} price drop(s).`,
+    };
+  } catch (error) {
+    console.error("Check prices now error:", error);
+    return { error: error.message || "Failed to check prices" };
+  }
 }

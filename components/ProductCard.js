@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { deleteProduct } from "@/app/actions";
+import { checkPricesNow, deleteProduct } from "@/app/actions";
 import PriceChart from "./PriceChart";
 import {
   Card,
@@ -17,18 +17,37 @@ import {
   TrendingDown,
   ChevronDown,
   ChevronUp,
+  RefreshCw,
 } from "lucide-react";
 import Link from "next/link";
+import { toast } from "sonner";
+import { useRouter } from "next/navigation";
 
 export default function ProductCard({ product }) {
   const [showChart, setShowChart] = useState(false);
   const [deleting, setDeleting] = useState(false);
+  const [checkingPrices, setCheckingPrices] = useState(false);
+  const router = useRouter();
 
   const handleDelete = async () => {
     if (!confirm("Remove this product from tracking?")) return;
 
     setDeleting(true);
     await deleteProduct(product.id);
+  };
+
+  const handleCheckPricesNow = async () => {
+    setCheckingPrices(true);
+    const result = await checkPricesNow();
+
+    if (result?.error) {
+      toast.error(result.error);
+    } else if (result?.success) {
+      toast.success(result.message);
+      router.refresh();
+    }
+
+    setCheckingPrices(false);
   };
 
   return (
@@ -88,6 +107,19 @@ export default function ProductCard({ product }) {
               <ExternalLink className="w-4 h-4" />
               View Product
             </Link>
+          </Button>
+
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleCheckPricesNow}
+            disabled={checkingPrices}
+            className="gap-1"
+          >
+            <RefreshCw
+              className={`w-4 h-4 ${checkingPrices ? "animate-spin" : ""}`}
+            />
+            Check Prices Now
           </Button>
 
           <Button
