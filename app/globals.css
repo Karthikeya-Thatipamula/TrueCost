@@ -128,3 +128,47 @@
     @apply font-sans;
   }
 }
+@layer utilities {
+  .hero-title-roll {
+    @apply relative inline-grid min-h-[1.3em] place-items-center align-bottom;
+  }
+
+  .hero-title-line {
+    @apply col-start-1 row-start-1 whitespace-nowrap;
+    line-height: 1.3em;
+    opacity: 0;
+    animation: hero-fade-roll 20s ease-in-out infinite;
+    animation-delay: var(--hero-delay);
+    will-change: transform, opacity;
+  }
+}
+
+@keyframes hero-fade-roll {
+  0%,
+  16% {
+    opacity: 0;
+    transform: translateY(20%);
+  }
+  20%,
+  36% {
+    opacity: 1;
+    transform: translateY(0);
+  }
+  40%,
+  100% {
+    opacity: 0;
+    transform: translateY(-20%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-title-line {
+    animation: none;
+    opacity: 0;
+    transform: none;
+  }
+
+  .hero-title-line:first-child {
+    opacity: 1;
+  }
+}

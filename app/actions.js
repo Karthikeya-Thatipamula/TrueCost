@@ -351,19 +351,29 @@ export async function getPriceHistory(productId) {
 export async function getPriceTrend(productId) {
   try {
     const supabase = await createClient();
-    const { data, error } = await supabase
-      .from("price_history")
-      .select("price, checked_at")
-      .eq("product_id", productId)
-      .order("checked_at", { ascending: false })
-      .limit(2);
+    const [latestResult, lowestResult] = await Promise.all([
+      supabase
+        .from("price_history")
+        .select("price, checked_at")
+        .eq("product_id", productId)
+        .order("checked_at", { ascending: false })
+        .limit(2),
+      supabase
+        .from("price_history")
+        .select("price")
+        .eq("product_id", productId)
+        .order("price", { ascending: true })
+        .limit(1),
+    ]);
 
-    if (error) throw error;
+    if (latestResult.error) throw latestResult.error;
+    if (lowestResult.error) throw lowestResult.error;
 
-    const entries = data || [];
+    const entries = latestResult.data || [];
+    const lowestPrice = Number(lowestResult.data?.[0]?.price ?? 0);
 
     if (entries.length === 0) {
-      return { trend: "new", percentage: 0, lastChecked: null };
+      return { trend: "new", percentage: 0, lastChecked: null, lowestPrice: null };
     }
 
     const [latest, previous] = entries;
@@ -373,6 +383,7 @@ export async function getPriceTrend(productId) {
         trend: "new",
         percentage: 0,
         lastChecked: latest.checked_at,
+        lowestPrice: Number.isFinite(lowestPrice) && lowestPrice > 0 ? lowestPrice : null,
       };
     }
 
@@ -384,10 +395,11 @@ export async function getPriceTrend(productId) {
       trend: change > 0 ? "up" : "down",
       percentage: Number(Math.abs(change).toFixed(1)),
       lastChecked: latest.checked_at,
+      lowestPrice: Number.isFinite(lowestPrice) && lowestPrice > 0 ? lowestPrice : null,
     };
   } catch (error) {
     console.error("Get price trend error:", error);
-    return { trend: "new", percentage: 0, lastChecked: null };
+    return { trend: "new", percentage: 0, lastChecked: null, lowestPrice: null };
   }
 }
 

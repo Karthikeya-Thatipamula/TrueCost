@@ -1,10 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import {
-  calculateTrueCost,
-  getUserPreferences,
-} from "@/app/actions";
+import { useEffect, useMemo, useState } from "react";
+import { calculateTrueCost, getUserPreferences } from "@/app/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -14,8 +11,55 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { ExternalLink, IndianRupee, Loader2, Tag } from "lucide-react";
+import {
+  ExternalLink,
+  IndianRupee,
+  Loader2,
+  SearchX,
+  Share2,
+  Tag,
+} from "lucide-react";
 import Link from "next/link";
+import { toast } from "sonner";
+
+function getSearchAdvice(result) {
+  const averagePrice = Number(result?.averagePrice ?? result?.price);
+  const currentPrice = Number(result?.price);
+
+  if (!Number.isFinite(currentPrice)) {
+    return {
+      label: "Good Deal",
+      reason: "Looks promising based on available search data.",
+      className: "bg-amber-50 text-amber-700 border-amber-200",
+    };
+  }
+
+  const ratio = Number.isFinite(averagePrice) && averagePrice > 0
+    ? currentPrice / averagePrice
+    : 1;
+
+  if (result?.isBestDeal || ratio <= 0.97) {
+    return {
+      label: "Buy Now",
+      reason: "This is one of the strongest prices in current search results.",
+      className: "bg-emerald-50 text-emerald-700 border-emerald-200",
+    };
+  }
+
+  if (ratio > 1.03) {
+    return {
+      label: "Wait",
+      reason: "Current result is above the best available deal right now.",
+      className: "bg-red-50 text-red-700 border-red-200",
+    };
+  }
+
+  return {
+    label: "Good Deal",
+    reason: "Solid price today. Keep tracking for deeper drops.",
+    className: "bg-amber-50 text-amber-700 border-amber-200",
+  };
+}
 
 export default function SearchResults({
   results = [],
@@ -24,6 +68,7 @@ export default function SearchResults({
   isTracking,
 }) {
   const [trueCostByUrl, setTrueCostByUrl] = useState({});
+  const [loadingTrueCost, setLoadingTrueCost] = useState(false);
 
   const selectedPlatforms = Array.from(
     new Set(
@@ -32,6 +77,17 @@ export default function SearchResults({
       )
     )
   );
+
+  const enrichedResults = useMemo(() => {
+    if (!results.length) return [];
+    const averagePrice =
+      results.reduce((sum, item) => sum + Number(item.price || 0), 0) / results.length;
+
+    return results.map((result) => ({
+      ...result,
+      averagePrice,
+    }));
+  }, [results]);
 
   useEffect(() => {
     let active = true;
@@ -43,16 +99,16 @@ export default function SearchResults({
         Array.isArray(preferences?.payment_methods) &&
         preferences.payment_methods.length > 0;
 
-      if (!active || !hasSavedPreferences || results.length === 0) {
+      if (!active || !hasSavedPreferences || enrichedResults.length === 0) {
         if (active) {
           setTrueCostByUrl({});
+          setLoadingTrueCost(false);
         }
         return;
       }
 
-      // Compute True Cost for each result using saved user preferences.
       const calculated = await Promise.all(
-        results.map(async (result) => {
+        enrichedResults.map(async (result) => {
           const trueCost = await calculateTrueCost(result, preferences);
           return [result.url, trueCost];
         })
@@ -60,6 +116,7 @@ export default function SearchResults({
 
       if (active) {
         setTrueCostByUrl(Object.fromEntries(calculated.filter(([, value]) => value)));
+        setLoadingTrueCost(false);
       }
     };
 
@@ -68,9 +125,26 @@ export default function SearchResults({
     return () => {
       active = false;
     };
-  }, [results]);
+  }, [enrichedResults]);
 
-  if (!results.length) return null;
+  const handleShareDeal = async (url) => {
+    try {
+      await navigator.clipboard.writeText(url);
+      toast.success("Deal link copied to clipboard!");
+    } catch {
+      toast.error("Could not copy link. Please copy manually.");
+    }
+  };
+
+  if (!results.length) {
+    return (
+      <div className="mt-6 rounded-xl border border-dashed border-gray-300 bg-white/80 px-6 py-10 text-center text-gray-600">
+        <SearchX className="mx-auto mb-3 h-10 w-10 text-gray-400" />
+        <p className="text-sm font-medium text-gray-700">No deal cards yet.</p>
+        <p className="text-sm">Search a product to see smart comparisons and recommendations.</p>
+      </div>
+    );
+  }
 
   return (
     <div className="mt-6 space-y-3 text-left">
@@ -88,93 +162,121 @@ export default function SearchResults({
       )}
 
       <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      {results.map((result) => {
-        const activeTrack = isTracking && trackingUrl === result.url;
-        const trueCost = trueCostByUrl[result.url];
+        {enrichedResults.map((result) => {
+          const activeTrack = isTracking && trackingUrl === result.url;
+          const trueCost = trueCostByUrl[result.url];
+          const smartAdvice = getSearchAdvice(result);
 
-        return (
-          <Card key={result.url} className="h-full border-gray-200">
-            <CardHeader className="pb-2">
-              <div className="flex items-start justify-between gap-3">
-                <Badge variant="outline" className="text-gray-600">
-                  {result.platform}
-                </Badge>
-                {result.isBestDeal && (
-                  <Badge className="bg-green-100 text-green-700 hover:bg-green-100">
-                    <Tag className="h-3 w-3" />
-                    Best Deal
+          return (
+            <Card key={result.url} className="h-full border-gray-200">
+              <CardHeader className="pb-2">
+                <div className="flex items-start justify-between gap-3">
+                  <Badge variant="outline" className="text-gray-600">
+                    {result.platform}
                   </Badge>
-                )}
-              </div>
-              <CardTitle className="line-clamp-2 text-sm md:text-base">
-                {result.name}
-              </CardTitle>
-            </CardHeader>
-
-            <CardContent>
-              {result.image_url ? (
-                // eslint-disable-next-line @next/next/no-img-element
-                <img
-                  src={result.image_url}
-                  alt={result.name}
-                  className="mb-3 h-40 w-full rounded-md border object-contain bg-white"
-                />
-              ) : null}
-              <p className="text-2xl font-bold text-orange-500 flex items-center gap-1">
-                {result.currency === "INR" ? (
-                  <IndianRupee className="h-5 w-5" />
-                ) : (
-                  <span className="text-sm font-medium">{result.currency}</span>
-                )}
-                {result.price.toLocaleString("en-IN")}
-              </p>
-
-              {trueCost && (
-                <div className="mt-3 rounded-md border border-green-100 bg-green-50/70 p-2">
-                  <p className="text-xs font-medium text-green-800">
-                    True Cost: {trueCost.currency}{" "}
-                    {trueCost.trueCost.toLocaleString("en-IN")}
-                  </p>
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {trueCost.offers.map((offer) => (
-                      <Badge
-                        key={`${result.url}-${offer.method}`}
-                        variant="outline"
-                        className={
-                          offer.method === trueCost.bestPaymentMethod
-                            ? "border-green-600 text-green-700 bg-green-100"
-                            : "text-gray-600"
-                        }
-                      >
-                        {offer.method}: {offer.discountPercent}% OFF
-                      </Badge>
-                    ))}
-                  </div>
+                  {result.isBestDeal && (
+                    <Badge className="bg-green-100 text-green-700 hover:bg-green-100">
+                      <Tag className="h-3 w-3" />
+                      Best Deal
+                    </Badge>
+                  )}
                 </div>
-              )}
-            </CardContent>
+                <CardTitle className="line-clamp-2 text-sm md:text-base">
+                  {result.name}
+                </CardTitle>
+              </CardHeader>
 
-            <CardFooter className="gap-2 flex-wrap">
-              <Button size="sm" className="flex-1" onClick={() => onTrack(result.url)} disabled={activeTrack || isTracking}>
-                {activeTrack ? (
-                  <>
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                    Tracking...
-                  </>
+              <CardContent>
+                {result.image_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={result.image_url}
+                    alt={result.name}
+                    className="mb-3 h-40 w-full rounded-md border object-contain bg-white"
+                  />
+                ) : null}
+                <p className="text-2xl font-bold text-orange-500 flex items-center gap-1">
+                  {result.currency === "INR" ? (
+                    <IndianRupee className="h-5 w-5" />
+                  ) : (
+                    <span className="text-sm font-medium">{result.currency}</span>
+                  )}
+                  {result.price.toLocaleString("en-IN")}
+                </p>
+
+                <div className="mt-3 rounded-md border p-2 bg-white">
+                  <Badge variant="outline" className={smartAdvice.className}>
+                    {smartAdvice.label}
+                  </Badge>
+                  <p className="mt-1 text-xs text-gray-600">{smartAdvice.reason}</p>
+                </div>
+
+                {loadingTrueCost ? (
+                  <div className="mt-3 rounded-md border bg-gray-50/70 p-2 animate-pulse">
+                    <div className="h-3.5 w-32 bg-gray-200 rounded" />
+                    <div className="mt-2 h-7 w-full bg-gray-200 rounded" />
+                  </div>
                 ) : (
-                  "Track This Price"
+                  trueCost && (
+                    <div className="mt-3 rounded-md border border-green-100 bg-green-50/70 p-2">
+                      <p className="text-xs font-medium text-green-800">
+                        True Cost: {trueCost.currency}{" "}
+                        {trueCost.trueCost.toLocaleString("en-IN")}
+                      </p>
+                      <div className="mt-2 flex flex-wrap gap-1">
+                        {trueCost.offers.map((offer) => (
+                          <Badge
+                            key={`${result.url}-${offer.method}`}
+                            variant="outline"
+                            className={
+                              offer.method === trueCost.bestPaymentMethod
+                                ? "border-green-600 text-green-700 bg-green-100"
+                                : "text-gray-600"
+                            }
+                          >
+                            {offer.method}: {offer.discountPercent}% OFF
+                          </Badge>
+                        ))}
+                      </div>
+                    </div>
+                  )
                 )}
-              </Button>
+              </CardContent>
 
-              <Button variant="outline" size="sm" asChild>
-                <Link href={result.url} target="_blank" rel="noopener noreferrer">
-                  <ExternalLink className="h-4 w-4" />
-                </Link>
-              </Button>
-            </CardFooter>
-          </Card>
-        );
-      })}
+              <CardFooter className="gap-2 flex-wrap">
+                <Button
+                  size="sm"
+                  className="flex-1"
+                  onClick={() => onTrack(result.url)}
+                  disabled={activeTrack || isTracking}
+                >
+                  {activeTrack ? (
+                    <>
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      Tracking...
+                    </>
+                  ) : (
+                    "Track This Price"
+                  )}
+                </Button>
+
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => handleShareDeal(result.url)}
+                >
+                  <Share2 className="h-4 w-4" />
+                </Button>
+
+                <Button variant="outline" size="sm" asChild>
+                  <Link href={result.url} target="_blank" rel="noopener noreferrer">
+                    <ExternalLink className="h-4 w-4" />
+                  </Link>
+                </Button>
+              </CardFooter>
+            </Card>
+          );
+        })}
       </div>
     </div>
   );

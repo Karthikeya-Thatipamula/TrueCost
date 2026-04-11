@@ -7,6 +7,14 @@ import AuthButton from "@/components/AuthButton";
 import PreferencesButton from "@/components/PreferencesButton";
 import Image from "next/image";
 
+const HERO_PHRASES = [
+  "Never Miss a Price Drop",
+  "Never Miss a Great Deal",
+  "Never Miss Big Coupons",
+  "Never Miss True Cost Savings",
+  "Never Miss Smart Offers",
+];
+
 export default async function Home() {
   const supabase = await createClient();
   const {
@@ -65,8 +73,19 @@ export default async function Home() {
             Made with ❤️ by TrueCost Team under the leadership Karthikeya Thatipamula
           </div>
 
-          <h2 className="text-5xl font-bold text-gray-900 mb-4 tracking-tight">
-            Never Miss a Price Drop
+          <h2 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4 tracking-tight">
+            <span className="sr-only">Never Miss a Price Drop</span>
+            <span aria-hidden className="hero-title-roll">
+              {HERO_PHRASES.map((phrase, index) => (
+                <span
+                  key={phrase}
+                  className="hero-title-line"
+                  style={{ "--hero-delay": `${index * 4}s` }}
+                >
+                  {phrase}
+                </span>
+              ))}
+            </span>
           </h2>
           <p className="text-xl text-gray-600 mb-12 max-w-2xl mx-auto">
             Paste a product URL or search across top stores to compare prices.
