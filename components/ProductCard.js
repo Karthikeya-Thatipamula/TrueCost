@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { checkPricesNow, deleteProduct } from "@/app/actions";
+import { useCallback, useEffect, useState } from "react";
+import { checkPricesNow, deleteProduct, getPriceTrend } from "@/app/actions";
 import PriceChart from "./PriceChart";
 import {
   Card,
@@ -14,6 +14,7 @@ import { Badge } from "@/components/ui/badge";
 import {
   ExternalLink,
   Trash2,
+  TrendingUp,
   TrendingDown,
   ChevronDown,
   ChevronUp,
@@ -27,7 +28,52 @@ export default function ProductCard({ product }) {
   const [showChart, setShowChart] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [checkingPrices, setCheckingPrices] = useState(false);
+  const [priceTrend, setPriceTrend] = useState({
+    trend: "new",
+    percentage: 0,
+    lastChecked: null,
+  });
   const router = useRouter();
+
+  const loadPriceTrend = useCallback(
+    async () => getPriceTrend(product.id),
+    [product.id]
+  );
+
+  useEffect(() => {
+    let active = true;
+
+    loadPriceTrend().then((trendData) => {
+      if (active) {
+        setPriceTrend(trendData);
+      }
+    });
+
+    return () => {
+      active = false;
+    };
+  }, [loadPriceTrend]);
+
+  const formatLastChecked = (timestamp) => {
+    if (!timestamp) return "Last checked: just now";
+
+    const now = new Date();
+    const checkedTime = new Date(timestamp);
+    const diffMs = now.getTime() - checkedTime.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+
+    if (diffHours < 1) {
+      const diffMinutes = Math.max(1, Math.floor(diffMs / (1000 * 60)));
+      return `Last checked: ${diffMinutes} minute${diffMinutes === 1 ? "" : "s"} ago`;
+    }
+
+    if (diffHours < 24) {
+      return `Last checked: ${diffHours} hour${diffHours === 1 ? "" : "s"} ago`;
+    }
+
+    const diffDays = Math.floor(diffHours / 24);
+    return `Last checked: ${diffDays} day${diffDays === 1 ? "" : "s"} ago`;
+  };
 
   const handleDelete = async () => {
     if (!confirm("Remove this product from tracking?")) return;
@@ -44,6 +90,8 @@ export default function ProductCard({ product }) {
       toast.error(result.error);
     } else if (result?.success) {
       toast.success(result.message);
+      const trendData = await loadPriceTrend();
+      setPriceTrend(trendData);
       router.refresh();
     }
 
@@ -72,11 +120,29 @@ export default function ProductCard({ product }) {
               <span className="text-3xl font-bold text-orange-500">
                 {product.currency} {product.current_price}
               </span>
-              <Badge variant="secondary" className="gap-1">
-                <TrendingDown className="w-3 h-3" />
-                Tracking
-              </Badge>
+              {priceTrend.trend === "new" ? (
+                <Badge variant="secondary">New</Badge>
+              ) : (
+                <Badge
+                  variant="secondary"
+                  className={
+                    priceTrend.trend === "down"
+                      ? "gap-1 text-green-700 bg-green-50 hover:bg-green-50"
+                      : "gap-1 text-red-700 bg-red-50 hover:bg-red-50"
+                  }
+                >
+                  {priceTrend.trend === "down" ? (
+                    <TrendingDown className="w-3 h-3" />
+                  ) : (
+                    <TrendingUp className="w-3 h-3" />
+                  )}
+                  {priceTrend.percentage}%
+                </Badge>
+              )}
             </div>
+            <p className="text-xs text-gray-500 mt-1">
+              {formatLastChecked(priceTrend.lastChecked)}
+            </p>
           </div>
         </div>
       </CardHeader>

@@ -143,6 +143,49 @@ export async function getPriceHistory(productId) {
   }
 }
 
+export async function getPriceTrend(productId) {
+  try {
+    const supabase = await createClient();
+    const { data, error } = await supabase
+      .from("price_history")
+      .select("price, checked_at")
+      .eq("product_id", productId)
+      .order("checked_at", { ascending: false })
+      .limit(2);
+
+    if (error) throw error;
+
+    const entries = data || [];
+
+    if (entries.length === 0) {
+      return { trend: "new", percentage: 0, lastChecked: null };
+    }
+
+    const [latest, previous] = entries;
+
+    if (!previous || Number(previous.price) === 0) {
+      return {
+        trend: "new",
+        percentage: 0,
+        lastChecked: latest.checked_at,
+      };
+    }
+
+    const latestPrice = Number(latest.price);
+    const previousPrice = Number(previous.price);
+    const change = ((latestPrice - previousPrice) / previousPrice) * 100;
+
+    return {
+      trend: change > 0 ? "up" : "down",
+      percentage: Number(Math.abs(change).toFixed(1)),
+      lastChecked: latest.checked_at,
+    };
+  } catch (error) {
+    console.error("Get price trend error:", error);
+    return { trend: "new", percentage: 0, lastChecked: null };
+  }
+}
+
 export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();
