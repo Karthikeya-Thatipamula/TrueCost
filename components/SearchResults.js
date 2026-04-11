@@ -1,5 +1,10 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import {
+  calculateTrueCost,
+  getUserPreferences,
+} from "@/app/actions";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,12 +23,52 @@ export default function SearchResults({
   trackingUrl,
   isTracking,
 }) {
+  const [trueCostByUrl, setTrueCostByUrl] = useState({});
+
+  useEffect(() => {
+    let active = true;
+
+    const loadTrueCosts = async () => {
+      const preferences = await getUserPreferences();
+      const hasSavedPreferences =
+        Boolean(preferences?.updated_at) &&
+        Array.isArray(preferences?.payment_methods) &&
+        preferences.payment_methods.length > 0;
+
+      if (!active || !hasSavedPreferences || results.length === 0) {
+        if (active) {
+          setTrueCostByUrl({});
+        }
+        return;
+      }
+
+      // Compute True Cost for each result using saved user preferences.
+      const calculated = await Promise.all(
+        results.map(async (result) => {
+          const trueCost = await calculateTrueCost(result, preferences);
+          return [result.url, trueCost];
+        })
+      );
+
+      if (active) {
+        setTrueCostByUrl(Object.fromEntries(calculated.filter(([, value]) => value)));
+      }
+    };
+
+    loadTrueCosts();
+
+    return () => {
+      active = false;
+    };
+  }, [results]);
+
   if (!results.length) return null;
 
   return (
     <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3 text-left">
       {results.map((result) => {
         const activeTrack = isTracking && trackingUrl === result.url;
+        const trueCost = trueCostByUrl[result.url];
 
         return (
           <Card key={result.url} className="h-full border-gray-200">
@@ -61,6 +106,30 @@ export default function SearchResults({
                 )}
                 {result.price.toLocaleString("en-IN")}
               </p>
+
+              {trueCost && (
+                <div className="mt-3 rounded-md border border-green-100 bg-green-50/70 p-2">
+                  <p className="text-xs font-medium text-green-800">
+                    True Cost: {trueCost.currency}{" "}
+                    {trueCost.trueCost.toLocaleString("en-IN")}
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {trueCost.offers.map((offer) => (
+                      <Badge
+                        key={`${result.url}-${offer.method}`}
+                        variant="outline"
+                        className={
+                          offer.method === trueCost.bestPaymentMethod
+                            ? "border-green-600 text-green-700 bg-green-100"
+                            : "text-gray-600"
+                        }
+                      >
+                        {offer.method}: {offer.discountPercent}% OFF
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
             </CardContent>
 
             <CardFooter className="gap-2 flex-wrap">

@@ -1,7 +1,13 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import { checkPricesNow, deleteProduct, getPriceTrend } from "@/app/actions";
+import {
+  calculateTrueCost,
+  checkPricesNow,
+  deleteProduct,
+  getPriceTrend,
+  getUserPreferences,
+} from "@/app/actions";
 import PriceChart from "./PriceChart";
 import {
   Card,
@@ -33,6 +39,7 @@ export default function ProductCard({ product }) {
     percentage: 0,
     lastChecked: null,
   });
+  const [trueCost, setTrueCost] = useState(null);
   const router = useRouter();
 
   const loadPriceTrend = useCallback(
@@ -53,6 +60,37 @@ export default function ProductCard({ product }) {
       active = false;
     };
   }, [loadPriceTrend]);
+
+  useEffect(() => {
+    let active = true;
+
+    const loadTrueCost = async () => {
+      const preferences = await getUserPreferences();
+      const hasSavedPreferences =
+        Boolean(preferences?.updated_at) &&
+        Array.isArray(preferences?.payment_methods) &&
+        preferences.payment_methods.length > 0;
+
+      if (!active || !hasSavedPreferences) {
+        if (active) {
+          setTrueCost(null);
+        }
+        return;
+      }
+
+      // Show non-intrusive True Cost details only for users with saved preferences.
+      const calculatedTrueCost = await calculateTrueCost(product, preferences);
+      if (active) {
+        setTrueCost(calculatedTrueCost);
+      }
+    };
+
+    loadTrueCost();
+
+    return () => {
+      active = false;
+    };
+  }, [product]);
 
   const formatLastChecked = (timestamp) => {
     if (!timestamp) return "Last checked: just now";
@@ -143,6 +181,29 @@ export default function ProductCard({ product }) {
             <p className="text-xs text-gray-500 mt-1">
               {formatLastChecked(priceTrend.lastChecked)}
             </p>
+            {trueCost && (
+              <div className="mt-2 rounded-md border border-green-100 bg-green-50/70 p-2">
+                <p className="text-xs font-medium text-green-800">
+                  True Cost: {trueCost.currency}{" "}
+                  {trueCost.trueCost.toLocaleString("en-IN")}
+                </p>
+                <div className="mt-2 flex flex-wrap gap-1">
+                  {trueCost.offers.map((offer) => (
+                    <Badge
+                      key={`${product.id}-${offer.method}`}
+                      variant="outline"
+                      className={
+                        offer.method === trueCost.bestPaymentMethod
+                          ? "border-green-600 text-green-700 bg-green-100"
+                          : "text-gray-600"
+                      }
+                    >
+                      {offer.method}: {offer.discountPercent}% OFF
+                    </Badge>
+                  ))}
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </CardHeader>

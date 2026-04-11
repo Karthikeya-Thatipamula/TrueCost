@@ -18,6 +18,56 @@ function parseNumericPrice(rawPrice) {
   return Number(normalized);
 }
 
+// Rule-based bank/checkout offers used for True Cost estimates.
+const BANK_OFFER_RULES = {
+  "HDFC Credit Card": { discountPercent: 5, maxDiscount: 2500 },
+  "SBI Debit Card": { discountPercent: 10, maxDiscount: 1500 },
+  "Axis Credit Card": { discountPercent: 7.5, maxDiscount: 2000 },
+  UPI: { discountPercent: 3, maxDiscount: 500 },
+  "ICICI Credit Card": { discountPercent: 6, maxDiscount: 1800 },
+  "Amazon Pay": { discountPercent: 4, maxDiscount: 800 },
+};
+
+export async function calculateTrueCost(product, userPreferences) {
+  const basePrice = Number(product?.price ?? product?.current_price);
+  const currency = String(product?.currency || "INR").toUpperCase();
+  const paymentMethods = Array.isArray(userPreferences?.payment_methods)
+    ? userPreferences.payment_methods
+    : [];
+
+  if (!Number.isFinite(basePrice) || basePrice <= 0 || paymentMethods.length === 0) {
+    return null;
+  }
+
+  // Estimate offer value for each selected payment method.
+  const offers = paymentMethods.map((method) => {
+    const offerRule = BANK_OFFER_RULES[method] || { discountPercent: 0, maxDiscount: 0 };
+    const discountRaw = (basePrice * offerRule.discountPercent) / 100;
+    const discountAmount = Math.min(discountRaw, offerRule.maxDiscount);
+    const finalPrice = Math.max(0, basePrice - discountAmount);
+
+    return {
+      method,
+      discountPercent: offerRule.discountPercent,
+      discountAmount: Number(discountAmount.toFixed(2)),
+      finalPrice: Number(finalPrice.toFixed(2)),
+      currency,
+    };
+  });
+
+  const bestOffer = offers.reduce((best, current) =>
+    !best || current.finalPrice < best.finalPrice ? current : best
+  , null);
+
+  return {
+    basePrice: Number(basePrice.toFixed(2)),
+    currency,
+    offers,
+    trueCost: bestOffer?.finalPrice ?? Number(basePrice.toFixed(2)),
+    bestPaymentMethod: bestOffer?.method ?? null,
+  };
+}
+
 export async function smartSearchProducts(query) {
   const normalizedQuery = String(query || "").trim();
   if (!normalizedQuery) {
