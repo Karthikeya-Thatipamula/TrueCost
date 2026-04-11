@@ -11,6 +11,31 @@ const firecrawl = new FirecrawlAppV1({
   apiKey: process.env.FIRECRAWL_API_KEY,
 });
 
+const SEARCH_PLATFORM_CONFIG = {
+  "amazon.in": {
+    platform: "Amazon.in",
+    url: (query) => `https://www.amazon.in/s?k=${encodeURIComponent(query)}`,
+  },
+  "flipkart.com": {
+    platform: "Flipkart",
+    url: (query) => `https://www.flipkart.com/search?q=${encodeURIComponent(query)}`,
+  },
+  "myntra.com": {
+    platform: "Myntra",
+    url: (query) => `https://www.myntra.com/${encodeURIComponent(query)}`,
+  },
+  "croma.com": {
+    platform: "Croma",
+    url: (query) => `https://www.croma.com/searchB?q=${encodeURIComponent(query)}`,
+  },
+  "reliancedigital.in": {
+    platform: "Reliance Digital",
+    url: (query) => `https://www.reliancedigital.in/search?q=${encodeURIComponent(query)}`,
+  },
+};
+
+const DEFAULT_SEARCH_PLATFORMS = ["amazon.in", "flipkart.com"];
+
 function parseNumericPrice(rawPrice) {
   if (typeof rawPrice === "number") return rawPrice;
   if (typeof rawPrice !== "string") return NaN;
@@ -74,22 +99,40 @@ export async function smartSearchProducts(query) {
     return { error: "Please enter a product name to search." };
   }
 
-  const searchTargets = [
-    {
-      platform: "Amazon.in",
-      url: `https://www.amazon.in/s?k=${encodeURIComponent(normalizedQuery)}`,
-    },
-    {
-      platform: "Flipkart",
-      url: `https://www.flipkart.com/search?q=${encodeURIComponent(normalizedQuery)}`,
-    },
-    {
-      platform: "Myntra",
-      url: `https://www.myntra.com/${encodeURIComponent(normalizedQuery)}`,
-    },
-  ];
-
   try {
+    const preferences = await getUserPreferences();
+    const selectedDomains = Array.isArray(preferences?.search_platforms)
+      ? preferences.search_platforms
+      : [];
+
+    const domainTargets = (selectedDomains.length > 0
+      ? selectedDomains
+      : DEFAULT_SEARCH_PLATFORMS
+    ).filter((domain, index, list) => list.indexOf(domain) === index);
+
+    const searchTargets = domainTargets
+      .map((domain) => {
+        const config = SEARCH_PLATFORM_CONFIG[domain];
+        if (!config) return null;
+
+        return {
+          domain,
+          platform: config.platform,
+          url: config.url(normalizedQuery),
+        };
+      })
+      .filter(Boolean);
+
+    if (searchTargets.length === 0) {
+      return { error: "No valid platforms selected. Update your preferences and try again." };
+    }
+
+    console.log(
+      `[SmartSearch] Firecrawl credit usage: scraping ${searchTargets.length} platform(s) -> ${searchTargets
+        .map((target) => target.platform)
+        .join(", ")}`
+    );
+
     const settledResults = await Promise.allSettled(
       searchTargets.map(async ({ platform, url }) => {
         const result = await firecrawl.scrapeUrl(url, {
@@ -126,6 +169,7 @@ export async function smartSearchProducts(query) {
         return extracted
           .map((item) => ({
             platform,
+            searchedPlatforms: searchTargets.map((target) => target.platform),
             name: String(item.name || "").trim(),
             price: parseNumericPrice(item.price),
             currency: String(item.currency || "INR").trim().toUpperCase(),
@@ -364,12 +408,16 @@ export async function saveUserPreferences(preferences) {
     const favoriteCategories = Array.isArray(preferences?.favorite_categories)
       ? preferences.favorite_categories
       : [];
+    const searchPlatforms = Array.isArray(preferences?.search_platforms)
+      ? preferences.search_platforms
+      : [];
 
     const { error } = await supabase.from("user_preferences").upsert(
       {
         user_id: user.id,
         payment_methods: paymentMethods,
         favorite_categories: favoriteCategories,
+        search_platforms: searchPlatforms,
         updated_at: new Date().toISOString(),
       },
       { onConflict: "user_id" }
@@ -398,7 +446,7 @@ export async function getUserPreferences() {
 
     const { data, error } = await supabase
       .from("user_preferences")
-      .select("payment_methods, favorite_categories, updated_at")
+      .select("payment_methods, favorite_categories, search_platforms, updated_at")
       .eq("user_id", user.id)
       .maybeSingle();
 
@@ -408,6 +456,7 @@ export async function getUserPreferences() {
       data || {
         payment_methods: [],
         favorite_categories: [],
+        search_platforms: [],
         updated_at: null,
       }
     );
@@ -416,6 +465,7 @@ export async function getUserPreferences() {
     return {
       payment_methods: [],
       favorite_categories: [],
+      search_platforms: [],
       updated_at: null,
     };
   }

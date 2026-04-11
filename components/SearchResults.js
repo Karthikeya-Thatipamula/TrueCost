@@ -25,6 +25,14 @@ export default function SearchResults({
 }) {
   const [trueCostByUrl, setTrueCostByUrl] = useState({});
 
+  const selectedPlatforms = Array.from(
+    new Set(
+      results.flatMap((result) =>
+        Array.isArray(result?.searchedPlatforms) ? result.searchedPlatforms : []
+      )
+    )
+  );
+
   useEffect(() => {
     let active = true;
 
@@ -65,7 +73,21 @@ export default function SearchResults({
   if (!results.length) return null;
 
   return (
-    <div className="mt-6 grid gap-4 md:grid-cols-2 lg:grid-cols-3 text-left">
+    <div className="mt-6 space-y-3 text-left">
+      {selectedPlatforms.length > 0 && (
+        <div className="flex flex-wrap items-center gap-2">
+          <Badge variant="outline" className="text-gray-600">
+            Searching {selectedPlatforms.join(" + ")}
+          </Badge>
+          {selectedPlatforms.map((platform) => (
+            <Badge key={platform} variant="secondary" className="text-xs">
+              {platform}
+            </Badge>
+          ))}
+        </div>
+      )}
+
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
       {results.map((result) => {
         const activeTrack = isTracking && trackingUrl === result.url;
         const trueCost = trueCostByUrl[result.url];
@@ -153,6 +175,7 @@ export default function SearchResults({
           </Card>
         );
       })}
+      </div>
     </div>
   );
 }
