@@ -70,7 +70,7 @@ export default async function Home() {
       <section className="py-20 px-4">
         <div className="max-w-7xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 bg-orange-100 text-orange-700 px-6 py-2 rounded-full text-sm font-medium mb-6">
-            Made with ❤️ by TrueCost Team under the leadership Karthikeya Thatipamula
+            Made with ❤️ by TrueCost Team 
           </div>
 
           <h2 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4 tracking-tight">
