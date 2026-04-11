@@ -186,6 +186,80 @@ export async function getPriceTrend(productId) {
   }
 }
 
+export async function saveUserPreferences(preferences) {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return { error: "Not authenticated" };
+    }
+
+    const paymentMethods = Array.isArray(preferences?.payment_methods)
+      ? preferences.payment_methods
+      : [];
+    const favoriteCategories = Array.isArray(preferences?.favorite_categories)
+      ? preferences.favorite_categories
+      : [];
+
+    const { error } = await supabase.from("user_preferences").upsert(
+      {
+        user_id: user.id,
+        payment_methods: paymentMethods,
+        favorite_categories: favoriteCategories,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id" }
+    );
+
+    if (error) throw error;
+
+    revalidatePath("/");
+    return { success: true };
+  } catch (error) {
+    console.error("Save user preferences error:", error);
+    return { error: error.message || "Failed to save preferences" };
+  }
+}
+
+export async function getUserPreferences() {
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+
+    if (!user) {
+      return null;
+    }
+
+    const { data, error } = await supabase
+      .from("user_preferences")
+      .select("payment_methods, favorite_categories, updated_at")
+      .eq("user_id", user.id)
+      .maybeSingle();
+
+    if (error) throw error;
+
+    return (
+      data || {
+        payment_methods: [],
+        favorite_categories: [],
+        updated_at: null,
+      }
+    );
+  } catch (error) {
+    console.error("Get user preferences error:", error);
+    return {
+      payment_methods: [],
+      favorite_categories: [],
+      updated_at: null,
+    };
+  }
+}
+
 export async function signOut() {
   const supabase = await createClient();
   await supabase.auth.signOut();

@@ -1,9 +1,10 @@
 import { createClient } from "@/utils/supabase/server";
-import { getProducts } from "./actions";
+import { getProducts, getUserPreferences } from "./actions";
 import AddProductForm from "@/components/AddProductForm";
 import ProductCard from "@/components/ProductCard";
 import { TrendingDown, Shield, Bell, Rabbit } from "lucide-react";
 import AuthButton from "@/components/AuthButton";
+import PreferencesButton from "@/components/PreferencesButton";
 import Image from "next/image";
 
 export default async function Home() {
@@ -13,6 +14,7 @@ export default async function Home() {
   } = await supabase.auth.getUser();
 
   const products = user ? await getProducts() : [];
+  const preferences = user ? await getUserPreferences() : null;
 
   const FEATURES = [
     {
@@ -49,7 +51,10 @@ export default async function Home() {
             />
           </div>
 
-          <AuthButton user={user} />
+          <div className="flex items-center gap-2">
+            {user && <PreferencesButton initialPreferences={preferences} />}
+            <AuthButton user={user} />
+          </div>
         </div>
       </header>
 
