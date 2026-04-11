@@ -34,6 +34,16 @@ const CATEGORY_OPTIONS = [
   "Groceries",
 ];
 
+const SEARCH_PLATFORM_OPTIONS = [
+  { label: "Amazon.in", value: "amazon.in" },
+  { label: "Flipkart", value: "flipkart.com" },
+  { label: "Myntra", value: "myntra.com" },
+  { label: "Croma", value: "croma.com" },
+  { label: "Reliance Digital", value: "reliancedigital.in" },
+];
+
+const DEFAULT_SEARCH_PLATFORMS = ["amazon.in", "flipkart.com", "myntra.com"];
+
 export default function PreferencesButton({ initialPreferences }) {
   const [open, setOpen] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -51,6 +61,14 @@ export default function PreferencesButton({ initialPreferences }) {
   const [favoriteCategories, setFavoriteCategories] = useState(
     defaultFavoriteCategories
   );
+  const defaultSearchPlatforms = useMemo(() => {
+    if (Array.isArray(initialPreferences?.search_platforms)) {
+      return initialPreferences.search_platforms;
+    }
+
+    return DEFAULT_SEARCH_PLATFORMS;
+  }, [initialPreferences?.search_platforms]);
+  const [searchPlatforms, setSearchPlatforms] = useState(defaultSearchPlatforms);
 
   const toggleSelection = (value, setSelectedValues) => {
     setSelectedValues((current) =>
@@ -65,6 +83,7 @@ export default function PreferencesButton({ initialPreferences }) {
     const result = await saveUserPreferences({
       payment_methods: paymentMethods,
       favorite_categories: favoriteCategories,
+      search_platforms: searchPlatforms,
     });
 
     if (result?.error) {
@@ -146,6 +165,38 @@ export default function PreferencesButton({ initialPreferences }) {
                 );
               })}
             </div>
+          </div>
+
+          <div>
+            <p className="text-sm font-medium text-gray-900 mb-2">Search Platforms</p>
+            <div className="flex flex-wrap gap-2">
+              {SEARCH_PLATFORM_OPTIONS.map((platformOption) => {
+                const active = searchPlatforms.includes(platformOption.value);
+
+                return (
+                  <Badge
+                    key={platformOption.value}
+                    variant={active ? "default" : "outline"}
+                    onClick={() =>
+                      toggleSelection(
+                        platformOption.value,
+                        setSearchPlatforms
+                      )
+                    }
+                    className={`cursor-pointer px-3 py-1 ${
+                      active ? "bg-orange-500 hover:bg-orange-600" : "hover:bg-orange-50"
+                    }`}
+                  >
+                    {platformOption.label}
+                  </Badge>
+                );
+              })}
+            </div>
+            {searchPlatforms.length === 0 && (
+              <p className="mt-2 text-xs text-gray-500">
+                No platform selected. Smart Search will fallback to Amazon.in + Flipkart.
+              </p>
+            )}
           </div>
         </div>
 
