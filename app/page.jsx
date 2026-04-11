@@ -76,15 +76,13 @@ export default async function Home() {
           <h2 className="text-4xl sm:text-5xl font-bold text-gray-900 mb-4 tracking-tight">
             <span className="sr-only">Never Miss a Price Drop</span>
             <span aria-hidden className="hero-title-roll">
-              {HERO_PHRASES.map((phrase, index) => (
-                <span
-                  key={phrase}
-                  className="hero-title-line"
-                  style={{ "--hero-delay": `${index * 4}s` }}
-                >
-                  {phrase}
-                </span>
-              ))}
+              <span className="hero-title-track">
+                {HERO_PHRASES.concat(HERO_PHRASES[0]).map((phrase, index) => (
+                  <span key={`${phrase}-${index}`} className="hero-title-line">
+                    {phrase}
+                  </span>
+                ))}
+              </span>
             </span>
           </h2>
           <p className="text-xl text-gray-600 mb-12 max-w-2xl mx-auto">

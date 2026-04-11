@@ -130,45 +130,60 @@
 }
 @layer utilities {
   .hero-title-roll {
-    @apply relative inline-grid min-h-[1.3em] place-items-center align-bottom;
+    @apply relative inline-block h-[1.3em] overflow-hidden align-bottom;
+  }
+
+  .hero-title-track {
+    @apply block;
+    animation: hero-roll 24s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+    will-change: transform;
   }
 
   .hero-title-line {
-    @apply col-start-1 row-start-1 whitespace-nowrap;
+    @apply block whitespace-nowrap;
     line-height: 1.3em;
-    opacity: 0;
-    animation: hero-fade-roll 20s ease-in-out infinite;
-    animation-delay: var(--hero-delay);
-    will-change: transform, opacity;
   }
 }
 
-@keyframes hero-fade-roll {
+@keyframes hero-roll {
   0%,
-  16% {
-    opacity: 0;
-    transform: translateY(20%);
-  }
-  20%,
-  36% {
-    opacity: 1;
+  14% {
     transform: translateY(0);
+    opacity: 1;
   }
-  40%,
+  17%,
+  31% {
+    transform: translateY(-100%);
+    opacity: 1;
+  }
+  34%,
+  48% {
+    transform: translateY(-200%);
+    opacity: 1;
+  }
+  51%,
+  65% {
+    transform: translateY(-300%);
+    opacity: 1;
+  }
+  68%,
+  82% {
+    transform: translateY(-400%);
+    opacity: 1;
+  }
+  85%,
+  99% {
+    transform: translateY(-500%);
+    opacity: 1;
+  }
   100% {
-    opacity: 0;
-    transform: translateY(-20%);
+    transform: translateY(-500%);
+    opacity: 1;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .hero-title-line {
+  .hero-title-track {
     animation: none;
-    opacity: 0;
-    transform: none;
-  }
-
-  .hero-title-line:first-child {
-    opacity: 1;
   }
 }
