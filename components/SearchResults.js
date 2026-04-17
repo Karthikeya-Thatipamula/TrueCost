@@ -22,6 +22,11 @@ import {
 import Link from "next/link";
 import { toast } from "sonner";
 
+function normalizeCurrency(currency) {
+  const normalized = String(currency ?? "").trim().toUpperCase();
+  return !normalized || normalized.includes("₹") ? "INR" : normalized;
+}
+
 function getSearchAdvice(result) {
   const averagePrice = Number(result?.averagePrice ?? result?.price);
   const currentPrice = Number(result?.price);
@@ -202,6 +207,8 @@ export default function SearchResults({
           const activeTrack = isTracking && trackingUrl === result.url;
           const trueCost = trueCostByUrl[result.url];
           const smartAdvice = getSearchAdvice(result);
+          const resultCurrency = normalizeCurrency(result.currency);
+          const trueCostCurrency = normalizeCurrency(trueCost?.currency);
 
           return (
             <Card key={result.url} className="h-full border-gray-200">
@@ -232,10 +239,10 @@ export default function SearchResults({
                   />
                 ) : null}
                 <p className="text-2xl font-bold text-orange-500 flex items-center gap-1">
-                  {result.currency === "INR" ? (
+                  {resultCurrency === "INR" ? (
                     <IndianRupee className="h-5 w-5" />
                   ) : (
-                    <span className="text-sm font-medium">{result.currency}</span>
+                    <span className="text-sm font-medium">{resultCurrency}</span>
                   )}
                   {result.price.toLocaleString("en-IN")}
                 </p>
@@ -256,7 +263,7 @@ export default function SearchResults({
                   trueCost && (
                     <div className="mt-3 rounded-md border border-green-100 bg-green-50/70 p-2">
                       <p className="text-xs font-medium text-green-800">
-                        True Cost: {trueCost.currency}{" "}
+                        True Cost: {trueCostCurrency}{" "}
                         {trueCost.trueCost.toLocaleString("en-IN")}
                       </p>
                       <div className="mt-2 flex flex-wrap gap-1">
@@ -335,36 +342,40 @@ export default function SearchResults({
           </div>
         ) : availableOffers.length > 0 ? (
           <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-            {availableOffers.map((offer) => (
-              <div
-                key={offer.id}
-                className={`rounded-lg border bg-white p-3 shadow-sm ${
-                  offer.isBest
-                    ? "border-green-300 bg-green-50/60 ring-1 ring-green-200"
-                    : "border-gray-200"
-                }`}
-              >
-                <p
-                  className={`text-sm font-semibold ${
-                    offer.isBest ? "text-green-800" : "text-gray-900"
+            {availableOffers.map((offer) => {
+              const offerCurrency = normalizeCurrency(offer.currency);
+
+              return (
+                <div
+                  key={offer.id}
+                  className={`rounded-lg border bg-white p-3 shadow-sm ${
+                    offer.isBest
+                      ? "border-green-300 bg-green-50/60 ring-1 ring-green-200"
+                      : "border-gray-200"
                   }`}
                 >
-                  {offer.method} → {offer.discountPercent}% OFF
-                </p>
-                <p className="mt-1 text-xs text-gray-600">
-                  Save up to {offer.currency === "INR" ? "₹" : `${offer.currency} `}
-                  {Number(offer.discountAmount || 0).toLocaleString("en-IN")} on this deal.
-                </p>
-                <p className="mt-1 text-xs text-gray-500 line-clamp-1">
-                  {offer.productName} · {offer.platform}
-                </p>
-                <Button asChild size="sm" variant="outline" className="mt-3 h-7 text-xs">
-                  <Link href={offer.productUrl} target="_blank" rel="noopener noreferrer">
-                    View Offer
-                  </Link>
-                </Button>
-              </div>
-            ))}
+                  <p
+                    className={`text-sm font-semibold ${
+                      offer.isBest ? "text-green-800" : "text-gray-900"
+                    }`}
+                  >
+                    {offer.method} → {offer.discountPercent}% OFF
+                  </p>
+                  <p className="mt-1 text-xs text-gray-600">
+                    Save up to {offerCurrency === "INR" ? "₹" : `${offerCurrency} `}
+                    {Number(offer.discountAmount || 0).toLocaleString("en-IN")} on this deal.
+                  </p>
+                  <p className="mt-1 text-xs text-gray-500 line-clamp-1">
+                    {offer.productName} · {offer.platform}
+                  </p>
+                  <Button asChild size="sm" variant="outline" className="mt-3 h-7 text-xs">
+                    <Link href={offer.productUrl} target="_blank" rel="noopener noreferrer">
+                      View Offer
+                    </Link>
+                  </Button>
+                </div>
+              );
+            })}
           </div>
         ) : (
           <div className="mt-4 rounded-lg border border-dashed bg-white/90 p-3 text-sm text-gray-600">

@@ -12,13 +12,19 @@ const TABS = [
   { id: "fees", label: "Hidden Fees", icon: ReceiptText },
 ];
 
+function normalizeCurrency(currency) {
+  const normalized = String(currency ?? "").trim().toUpperCase();
+  return !normalized || normalized.includes("₹") ? "INR" : normalized;
+}
+
 function formatMoney(value, currency = "INR") {
   const amount = Number(value);
   if (!Number.isFinite(amount)) return "—";
+  const normalizedCurrency = normalizeCurrency(currency);
 
   return new Intl.NumberFormat("en-IN", {
     style: "currency",
-    currency,
+    currency: normalizedCurrency,
     maximumFractionDigits: 2,
   }).format(amount);
 }
@@ -52,7 +58,7 @@ export default function DealsHub({ products = [], preferences = null }) {
           basePrice: Number(product.current_price ?? product.price ?? 0),
           bestPaymentMethod: trueCostData?.bestPaymentMethod,
           trueCost: trueCostData?.trueCost,
-          currency: trueCostData?.currency || product.currency || "INR",
+          currency: normalizeCurrency(trueCostData?.currency || product.currency || "INR"),
         };
       }),
     [products]
@@ -84,7 +90,7 @@ export default function DealsHub({ products = [], preferences = null }) {
 
   const selectedRow = comparisonRows.find((row) => String(row.id) === String(selectedProductId));
   const feeBasePrice = Number(selectedRow?.trueCost ?? selectedRow?.basePrice ?? 0);
-  const feeCurrency = selectedRow?.currency || "INR";
+  const feeCurrency = normalizeCurrency(selectedRow?.currency || "INR");
   const parsedDeliveryFee = Number(deliveryFee) || 0;
   const parsedTaxPercent = Number(taxPercent) || 0;
   const parsedPlatformFeePercent = Number(platformFeePercent) || 0;

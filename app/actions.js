@@ -43,6 +43,16 @@ function parseNumericPrice(rawPrice) {
   return Number(normalized);
 }
 
+function normalizeCurrency(currency) {
+  const normalized = String(currency ?? "").trim().toUpperCase();
+
+  if (!normalized || normalized.includes("₹")) {
+    return "INR";
+  }
+
+  return normalized;
+}
+
 // Rule-based bank/checkout offers used for True Cost estimates.
 const BANK_OFFER_RULES = {
   "HDFC Credit Card": { discountPercent: 5, maxDiscount: 2500 },
@@ -55,7 +65,7 @@ const BANK_OFFER_RULES = {
 
 export async function calculateTrueCost(product, userPreferences) {
   const basePrice = Number(product?.price ?? product?.current_price);
-  const currency = String(product?.currency || "INR").toUpperCase();
+  const currency = normalizeCurrency(product?.currency || "INR");
   const paymentMethods = Array.isArray(userPreferences?.payment_methods)
     ? userPreferences.payment_methods
     : [];
@@ -172,7 +182,7 @@ export async function smartSearchProducts(query) {
             searchedPlatforms: searchTargets.map((target) => target.platform),
             name: String(item.name || "").trim(),
             price: parseNumericPrice(item.price),
-            currency: String(item.currency || "INR").trim().toUpperCase(),
+            currency: normalizeCurrency(item.currency || "INR"),
             url: String(item.url || "").trim(),
             image_url: String(item.image_url || "").trim(),
           }))
@@ -237,7 +247,7 @@ export async function addProduct(formData) {
     }
 
     const newPrice = parseFloat(productData.currentPrice);
-    const currency = productData.currencyCode || "USD";
+    const currency = normalizeCurrency(productData.currencyCode || "USD");
 
     // Check if product exists to determine if it's an update
     const { data: existingProduct } = await supabase
@@ -542,7 +552,7 @@ export async function checkPricesNow() {
         const { error: historyError } = await supabase.from("price_history").insert({
           product_id: product.id,
           price: newPrice,
-          currency: product.currency,
+          currency: normalizeCurrency(product.currency),
         });
 
         if (historyError) continue;
