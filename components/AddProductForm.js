@@ -69,6 +69,8 @@ export default function AddProductForm({ user }) {
 
   const handleSmartSearch = async (e) => {
     e.preventDefault();
+    if (!ensureAuth()) return;
+
     if (!searchQuery.trim()) {
       toast.error("Please enter a product name to search.");
       return;

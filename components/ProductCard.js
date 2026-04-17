@@ -278,6 +278,9 @@ export default function ProductCard({ product }) {
             ) : (
               trueCost && (
                 <div className="mt-2 rounded-md border border-green-100 bg-green-50/70 p-2">
+                  <p className="text-[11px] font-semibold uppercase tracking-wide text-green-700">
+                    Available Coupons &amp; Offers
+                  </p>
                   <p className="text-xs font-medium text-green-800">
                     True Cost: {trueCost.currency}{" "}
                     {trueCost.trueCost.toLocaleString("en-IN")}
