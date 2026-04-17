@@ -89,10 +89,46 @@ export default function SearchResults({
     }));
   }, [results]);
 
+  const availableOffers = useMemo(() => {
+    const offers = [];
+
+    enrichedResults.forEach((result) => {
+      const trueCost = trueCostByUrl[result.url];
+      if (!trueCost?.offers?.length) return;
+
+      trueCost.offers
+        .filter((offer) => offer.discountPercent > 0)
+        .forEach((offer) => {
+          offers.push({
+            id: `${result.url}-${offer.method}`,
+            productName: result.name,
+            platform: result.platform,
+            productUrl: result.url,
+            currency: offer.currency || trueCost.currency || "INR",
+            method: offer.method,
+            discountPercent: offer.discountPercent,
+            discountAmount: offer.discountAmount,
+            isBest:
+              offer.method === trueCost.bestPaymentMethod &&
+              Number.isFinite(offer.finalPrice) &&
+              Number(offer.finalPrice) === Number(trueCost.trueCost),
+          });
+        });
+    });
+
+    return offers.sort((a, b) => {
+      if (a.isBest && !b.isBest) return -1;
+      if (!a.isBest && b.isBest) return 1;
+      return b.discountPercent - a.discountPercent;
+    });
+  }, [enrichedResults, trueCostByUrl]);
+
   useEffect(() => {
     let active = true;
 
     const loadTrueCosts = async () => {
+      if (active) setLoadingTrueCost(true);
+
       const preferences = await getUserPreferences();
       const hasSavedPreferences =
         Boolean(preferences?.updated_at) &&
@@ -277,6 +313,64 @@ export default function SearchResults({
             </Card>
           );
         })}
+      </div>
+
+      <div className="rounded-xl border border-orange-100 bg-orange-50/40 p-4 md:p-5">
+        <h3 className="text-base md:text-lg font-semibold text-gray-900">
+          Available Coupons &amp; Bank Offers for You
+        </h3>
+        <p className="mt-1 text-xs md:text-sm text-gray-600">
+          Personalized from your saved payment preferences and true-cost rules.
+        </p>
+
+        {loadingTrueCost ? (
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {Array.from({ length: 3 }).map((_, index) => (
+              <div key={`offer-skeleton-${index}`} className="rounded-lg border bg-white p-3 animate-pulse">
+                <div className="h-4 w-2/3 rounded bg-gray-200" />
+                <div className="mt-2 h-3 w-full rounded bg-gray-200" />
+                <div className="mt-2 h-3 w-4/5 rounded bg-gray-200" />
+              </div>
+            ))}
+          </div>
+        ) : availableOffers.length > 0 ? (
+          <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            {availableOffers.map((offer) => (
+              <div
+                key={offer.id}
+                className={`rounded-lg border bg-white p-3 shadow-sm ${
+                  offer.isBest
+                    ? "border-green-300 bg-green-50/60 ring-1 ring-green-200"
+                    : "border-gray-200"
+                }`}
+              >
+                <p
+                  className={`text-sm font-semibold ${
+                    offer.isBest ? "text-green-800" : "text-gray-900"
+                  }`}
+                >
+                  {offer.method} → {offer.discountPercent}% OFF
+                </p>
+                <p className="mt-1 text-xs text-gray-600">
+                  Save up to {offer.currency === "INR" ? "₹" : `${offer.currency} `}
+                  {Number(offer.discountAmount || 0).toLocaleString("en-IN")} on this deal.
+                </p>
+                <p className="mt-1 text-xs text-gray-500 line-clamp-1">
+                  {offer.productName} · {offer.platform}
+                </p>
+                <Button asChild size="sm" variant="outline" className="mt-3 h-7 text-xs">
+                  <Link href={offer.productUrl} target="_blank" rel="noopener noreferrer">
+                    View Offer
+                  </Link>
+                </Button>
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="mt-4 rounded-lg border border-dashed bg-white/90 p-3 text-sm text-gray-600">
+            No eligible coupon or bank offer found for your current preferences.
+          </div>
+        )}
       </div>
     </div>
   );
