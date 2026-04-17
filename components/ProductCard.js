@@ -32,6 +32,11 @@ import Link from "next/link";
 import { toast } from "sonner";
 import { useRouter } from "next/navigation";
 
+function normalizeCurrency(currency) {
+  const normalized = String(currency ?? "").trim().toUpperCase();
+  return !normalized || normalized.includes("₹") ? "INR" : normalized;
+}
+
 function getSmartAdvice({ trend, percentage, lastChecked, currentPrice, lowestPrice }) {
   const now = Date.now();
   const checkedAt = lastChecked ? new Date(lastChecked).getTime() : now;
@@ -153,6 +158,9 @@ export default function ProductCard({ product }) {
       }),
     [priceTrend, product.current_price, lowestPrice]
   );
+  const displayCurrency = normalizeCurrency(product.currency);
+  const displayCurrentPrice = Number(product.current_price);
+  const trueCostCurrency = normalizeCurrency(trueCost?.currency);
 
   const formatLastChecked = (timestamp) => {
     if (!timestamp) return "Last checked: just now";
@@ -232,7 +240,10 @@ export default function ProductCard({ product }) {
 
             <div className="flex items-baseline gap-2">
               <span className="text-3xl font-bold text-orange-500">
-                {product.currency} {product.current_price}
+                {displayCurrency}{" "}
+                {Number.isFinite(displayCurrentPrice)
+                  ? displayCurrentPrice.toLocaleString("en-IN")
+                  : product.current_price}
               </span>
               {trendLoading ? (
                 <span className="h-6 w-20 animate-pulse rounded-full bg-gray-200" />
@@ -282,7 +293,7 @@ export default function ProductCard({ product }) {
                     Available Coupons &amp; Offers
                   </p>
                   <p className="text-xs font-medium text-green-800">
-                    True Cost: {trueCost.currency}{" "}
+                    True Cost: {trueCostCurrency}{" "}
                     {trueCost.trueCost.toLocaleString("en-IN")}
                   </p>
                   <div className="mt-2 flex flex-wrap gap-1">
