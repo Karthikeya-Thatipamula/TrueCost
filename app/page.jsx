@@ -1,11 +1,12 @@
 import { createClient } from "@/utils/supabase/server";
-import { getProducts, getUserPreferences } from "./actions";
+import { calculateTrueCost, getProducts, getUserPreferences } from "./actions";
 import AddProductForm from "@/components/AddProductForm";
 import ProductCard from "@/components/ProductCard";
 import { TrendingDown, Shield, Bell, Rabbit } from "lucide-react";
 import AuthButton from "@/components/AuthButton";
 import PreferencesButton from "@/components/PreferencesButton";
 import Image from "next/image";
+import DealsHub from "@/components/DealsHub";
 
 const HERO_PHRASES = [
   "Never Miss a Price Drop",
@@ -23,6 +24,15 @@ export default async function Home() {
 
   const products = user ? await getProducts() : [];
   const preferences = user ? await getUserPreferences() : null;
+
+  const productsWithTrueCost = user
+    ? await Promise.all(
+        products.map(async (product) => ({
+          ...product,
+          trueCost: await calculateTrueCost(product, preferences),
+        }))
+      )
+    : [];
 
   const FEATURES = [
     {
@@ -111,6 +121,10 @@ export default async function Home() {
           )}
         </div>
       </section>
+
+      {user && (
+        <DealsHub products={productsWithTrueCost} preferences={preferences} />
+      )}
 
       {/* Products Grid */}
       {user && products.length > 0 && (
